@@ -225,3 +225,14 @@ Python, JavaScript, TypeScript, JSX/TSX, Java, Go, Rust, C/C++, C#, Ruby, PHP, S
 ## License
 
 MIT
+
+## 🚀 Live Demo
+
+Frontend (UI): https://aicode-assist.streamlit.app/  
+Backend API: https://ai-code-assistant-yieh.onrender.com  
+
+## What it does
+AI-powered system that allows developers to upload a codebase and ask questions about it using retrieval-augmented generation (RAG).
+
+## Why this matters
+Understanding large codebases is time-consuming. This tool reduces onboarding time by enabling semantic search and contextual explanations.
