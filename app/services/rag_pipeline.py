@@ -10,7 +10,7 @@ import tiktoken
 from openai import OpenAI
 
 from app.utils.config import Settings
-from app.utils.models import QueryResponse, SourceChunk
+from app.utils.models import QueryResponse, SummarizeResponse, SourceChunk
 from app.services.embedder import Embedder
 from app.services.vector_store import VectorStore
 
@@ -54,6 +54,37 @@ class RAGPipeline:
             sources=sources,
             model_used=model,
         )
+
+    # Summary query — broad enough to surface architecture-level chunks
+    _SUMMARY_QUERY = "overall project architecture purpose modules components technologies"
+
+    _SUMMARY_SYSTEM_PROMPT = (
+        "You are an expert software engineer. "
+        "Analyse the code snippets provided and produce a structured summary with exactly these sections:\n"
+        "1. **Purpose** — what the project does\n"
+        "2. **Architecture** — high-level design and data flow\n"
+        "3. **Key Modules** — main components and their responsibilities\n"
+        "4. **Technologies** — languages, frameworks, and libraries in use\n\n"
+        "Base your answer strictly on the provided code. Do not invent details."
+    )
+
+    def summarize(self, chat_model: str | None = None) -> SummarizeResponse:
+        model = chat_model or self._settings.chat_model
+
+        # Reuse the same embed → retrieve → build-context path as run()
+        query_vec = self._embedder.embed_query(self._SUMMARY_QUERY)
+        candidates = self._store.query(query_vec, top_k=10)
+        context, _ = self._build_context(candidates)
+
+        response = self._client.chat.completions.create(
+            model=model,
+            temperature=0.3,
+            messages=[
+                {"role": "system", "content": self._SUMMARY_SYSTEM_PROMPT},
+                {"role": "user", "content": f"### Code Context\n{context}\n\nGenerate the structured summary."},
+            ],
+        )
+        return SummarizeResponse(summary=response.choices[0].message.content or "")
 
     def _build_context(self, chunks: list[SourceChunk]) -> tuple[str, list[SourceChunk]]:
         budget = self._settings.max_context_tokens

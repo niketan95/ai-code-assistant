@@ -41,3 +41,7 @@ class QueryResponse(BaseModel):
     answer: str
     sources: list[SourceChunk]
     model_used: str
+
+
+class SummarizeResponse(BaseModel):
+    summary: str

@@ -7,7 +7,7 @@ rather than surfacing as a cryptic error on the first request.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import ingest, query
+from app.routes import ingest, query, summarize
 from app.utils.config import get_settings
 
 get_settings()  # validate env vars early
@@ -27,6 +27,7 @@ app.add_middleware(
 
 app.include_router(ingest.router, prefix="/api/v1", tags=["ingest"])
 app.include_router(query.router, prefix="/api/v1", tags=["query"])
+app.include_router(summarize.router, prefix="/api/v1", tags=["summarize"])
 
 
 @app.get("/health", tags=["ops"])
