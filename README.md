@@ -1,4 +1,4 @@
-# AI Code Assistant (RAG-based)
+# AI Codebase Assistant (RAG-based)
 
 > Ask any question about a codebase. Get answers grounded in the actual source — with file paths and line numbers.
 
