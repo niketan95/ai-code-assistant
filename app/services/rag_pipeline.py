@@ -6,13 +6,16 @@ the model's context window. Retrieved sources are returned alongside the answer
 so the caller can render citations.
 """
 
+import logging
 import tiktoken
-from openai import OpenAI
+from openai import OpenAI, OpenAIError
 
 from app.utils.config import Settings
 from app.utils.models import QueryResponse, SummarizeResponse, SourceChunk
 from app.services.embedder import Embedder
 from app.services.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 _SYSTEM_PROMPT = (
     "You are an expert software engineer assistant. "
@@ -71,19 +74,34 @@ class RAGPipeline:
     def summarize(self, chat_model: str | None = None) -> SummarizeResponse:
         model = chat_model or self._settings.chat_model
 
-        # Reuse the same embed → retrieve → build-context path as run()
+        # Step 1: retrieve context
+        logger.info("Summarize — embedding summary query")
         query_vec = self._embedder.embed_query(self._SUMMARY_QUERY)
+
+        logger.info("Summarize — fetching top-10 chunks from vector store")
         candidates = self._store.query(query_vec, top_k=10)
         context, _ = self._build_context(candidates)
 
-        response = self._client.chat.completions.create(
-            model=model,
-            temperature=0.3,
-            messages=[
-                {"role": "system", "content": self._SUMMARY_SYSTEM_PROMPT},
-                {"role": "user", "content": f"### Code Context\n{context}\n\nGenerate the structured summary."},
-            ],
-        )
+        if not context.strip():
+            # Raised as ValueError so the route can map it to a 400
+            raise ValueError("No codebase indexed yet. Please ingest a repository first.")
+
+        # Step 2: call LLM
+        logger.info("Summarize — calling LLM (model=%s)", model)
+        try:
+            response = self._client.chat.completions.create(
+                model=model,
+                temperature=0.3,
+                messages=[
+                    {"role": "system", "content": self._SUMMARY_SYSTEM_PROMPT},
+                    {"role": "user", "content": f"### Code Context\n{context}\n\nGenerate the structured summary."},
+                ],
+            )
+        except OpenAIError as exc:
+            # Re-raise as RuntimeError — keeps OpenAI internals out of the route layer
+            logger.error("Summarize — LLM call failed: %s", exc, exc_info=True)
+            raise RuntimeError("LLM request failed. Please try again later.") from exc
+
         return SummarizeResponse(summary=response.choices[0].message.content or "")
 
     def _build_context(self, chunks: list[SourceChunk]) -> tuple[str, list[SourceChunk]]:

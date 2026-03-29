@@ -45,3 +45,7 @@ class QueryResponse(BaseModel):
 
 class SummarizeResponse(BaseModel):
     summary: str
+
+
+class ErrorResponse(BaseModel):
+    error: str
